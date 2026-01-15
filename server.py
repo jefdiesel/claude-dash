@@ -103,18 +103,20 @@ def process_otel_logs(otel_data):
 
                 # Only process API request events with token data
                 # event.name is "api_request", body is "claude_code.api_request"
-                # Skip compaction/summarization events (large input, don't count toward Claude's limits)
-                # Threshold 120K to only catch true compaction, not large context reads
-                if input_tokens > 120000:
-                    continue
-
                 if event_name == "api_request" and (input_tokens > 0 or output_tokens > 0):
+                    # Auto-detect compaction: high input (>100K) AND high output (>1K)
+                    # These don't count toward Claude's limits, but user can toggle
+                    is_compaction = input_tokens > 100000 and output_tokens > 1000
+
                     session = {
                         "timestamp": datetime.now().isoformat(),
                         "input": input_tokens + cache_creation,  # cache_read doesn't count toward limits
                         "output": output_tokens,
                         "note": f"auto: {model}" if model else "auto"
                     }
+                    if is_compaction:
+                        session["excluded"] = True
+                        session["note"] = f"compaction: {model}" if model else "compaction"
 
                     data = load_data()
                     data["sessions"].append(session)
@@ -187,6 +189,19 @@ class UsageHandler(SimpleHTTPRequestHandler):
                 removed = data["sessions"].pop(idx)
                 save_data(data)
                 self.send_json({"ok": True, "removed": removed})
+            else:
+                self.send_json({"ok": False, "error": "Invalid index"})
+
+        elif path == "/api/toggle-exclude":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+
+            data = load_data()
+            idx = body.get("index")
+            if idx is not None and 0 <= idx < len(data["sessions"]):
+                data["sessions"][idx]["excluded"] = not data["sessions"][idx].get("excluded", False)
+                save_data(data)
+                self.send_json({"ok": True, "excluded": data["sessions"][idx]["excluded"]})
             else:
                 self.send_json({"ok": False, "error": "Invalid index"})
 

@@ -101,7 +101,8 @@ tail -f ~/usage/server.log
 
 **Token counting notes:**
 - Cache read tokens don't count toward limits. Only input + output + cache_creation.
-- Compaction/summarization events (>120K input) are filtered out - Claude doesn't count these toward limits.
+- Compaction events (>100K input AND >1K output) are auto-detected and excluded.
+- Use the "Count" toggle in Recent API Calls to manually include/exclude any entry.
 
 ## API Endpoints
 

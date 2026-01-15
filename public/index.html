@@ -79,6 +79,11 @@
     .btn-danger:hover { background: #f85149; }
     .btn-log { background: #1f6feb; color: white; }
     .btn-log:hover { background: #388bfd; }
+    .btn-exclude-on { background: #238636; color: white; }
+    .btn-exclude-on:hover { background: #2ea043; }
+    .btn-exclude-off { background: #6e7681; color: white; }
+    .btn-exclude-off:hover { background: #8b949e; }
+    tr.excluded { opacity: 0.4; text-decoration: line-through; }
 
     .compare-row {
       display: flex;
@@ -298,7 +303,7 @@
     <h2>Recent API Calls</h2>
     <table id="sessionsTable">
       <thead>
-        <tr><th>Time</th><th>Input</th><th>Output</th><th>Total</th><th>Model</th><th></th></tr>
+        <tr><th>Time</th><th>Input</th><th>Output</th><th>Total</th><th>Model</th><th>Count</th><th></th></tr>
       </thead>
       <tbody id="sessionsList"></tbody>
     </table>
@@ -403,7 +408,7 @@
     }
 
     function getSessionsInRange(start) {
-      return usageData.sessions.filter(s => new Date(s.timestamp) >= start);
+      return usageData.sessions.filter(s => new Date(s.timestamp) >= start && !s.excluded);
     }
 
     function sumTokens(sessions) {
@@ -477,12 +482,16 @@
             const time = dt.toLocaleTimeString();
             const total = (s.input || 0) + (s.output || 0);
             const model = (s.note || '').replace('auto:', '').replace('sync:', '').trim() || '-';
-            return `<tr>
+            const excluded = s.excluded ? 'excluded' : '';
+            const toggleLabel = s.excluded ? 'No' : 'Yes';
+            const toggleClass = s.excluded ? 'btn-exclude-off' : 'btn-exclude-on';
+            return `<tr class="${excluded}">
               <td>${time}</td>
               <td>${formatNumber(s.input || 0)}</td>
               <td>${formatNumber(s.output || 0)}</td>
               <td>${formatNumber(total)}</td>
               <td><span class="session-tag">${model}</span></td>
+              <td><button class="btn-sm ${toggleClass}" onclick="toggleExclude(${idx})">${toggleLabel}</button></td>
               <td><button class="delete-btn" onclick="deleteSession(${idx})">x</button></td>
             </tr>`;
           })
@@ -661,6 +670,15 @@
     async function deleteSession(idx) {
       if (!confirm('Delete this entry?')) return;
       await fetch('/api/delete-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index: idx })
+      });
+      loadData();
+    }
+
+    async function toggleExclude(idx) {
+      await fetch('/api/toggle-exclude', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ index: idx })

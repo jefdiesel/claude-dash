@@ -15,8 +15,29 @@
       max-width: 900px;
       margin: 0 auto;
     }
-    h1 { color: #58a6ff; margin-bottom: 8px; font-size: 24px; }
-    .subtitle { color: #8b949e; margin-bottom: 24px; }
+    h1 { color: #58a6ff; margin-bottom: 4px; font-size: 24px; }
+    .subtitle { color: #8b949e; margin-bottom: 0; }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .tier-select {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tier-select label { color: #8b949e; font-size: 13px; }
+    .tier-select select {
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #c9d1d9;
+      font-size: 14px;
+      cursor: pointer;
+    }
     .card {
       background: #161b22;
       border: 1px solid #30363d;
@@ -139,8 +160,20 @@
   </style>
 </head>
 <body>
-  <h1>Claude Max Token Tracker</h1>
-  <p class="subtitle">5x Plan Usage Monitor</p>
+  <div class="header-row">
+    <div>
+      <h1>Claude Token Tracker</h1>
+      <p class="subtitle">Usage Monitor</p>
+    </div>
+    <div class="tier-select">
+      <label>Plan:</label>
+      <select id="tierSelect" onchange="saveTier()">
+        <option value="pro">Pro</option>
+        <option value="max5x">Max 5x</option>
+        <option value="max20x">Max 20x</option>
+      </select>
+    </div>
+  </div>
 
   <div class="card">
     <h2>Usage</h2>
@@ -235,7 +268,25 @@
       resetDay: 1,
       sessions: [],
       calibrations: [],
-      sessionStartOverride: null
+      tier: 'max5x'
+    };
+
+    const TIER_LIMITS = {
+      pro: {
+        session: 500000,      // ~500K
+        weekly: 3500000,      // ~3.5M
+        monthly: 10000000     // ~10M
+      },
+      max5x: {
+        session: 2500000,     // ~2.5M
+        weekly: 17400000,     // ~17.4M
+        monthly: 45000000     // ~45M
+      },
+      max20x: {
+        session: 10000000,    // ~10M (4x max5x)
+        weekly: 70000000,     // ~70M
+        monthly: 180000000    // ~180M
+      }
     };
 
     function formatNumber(n) {
@@ -316,7 +367,16 @@
       document.getElementById(infoId).textContent = `${formatNumber(used)} / ${formatNumber(limit)}`;
     }
 
+    function getTierLimits() {
+      const tier = usageData.tier || 'max5x';
+      return TIER_LIMITS[tier] || TIER_LIMITS.max5x;
+    }
+
     function updateUI() {
+      // Set tier dropdown
+      document.getElementById('tierSelect').value = usageData.tier || 'max5x';
+
+      const limits = getTierLimits();
       const sessionStart = getSessionStart();
       const sessionSessions = getSessionsInRange(sessionStart);
       const weeklySessions = getSessionsInRange(getWeekStart());
@@ -326,9 +386,9 @@
       const weeklyUsed = sumTokens(weeklySessions);
       const monthlyUsed = sumTokens(monthlySessions);
 
-      updateProgressBar('sessionBar', 'sessionInfo', sessionUsed, usageData.sessionLimit);
-      updateProgressBar('weeklyBar', 'weeklyInfo', weeklyUsed, usageData.weeklyLimit);
-      updateProgressBar('monthlyBar', 'monthlyInfo', monthlyUsed, usageData.monthlyLimit);
+      updateProgressBar('sessionBar', 'sessionInfo', sessionUsed, limits.session);
+      updateProgressBar('weeklyBar', 'weeklyInfo', weeklyUsed, limits.weekly);
+      updateProgressBar('monthlyBar', 'monthlyInfo', monthlyUsed, limits.monthly);
 
       document.getElementById('sessionTokens').textContent = formatNumber(sessionUsed);
       document.getElementById('weeklyTokens').textContent = formatNumber(weeklyUsed);
@@ -515,6 +575,17 @@
 
       alert(`${type} calibration recorded!\nTracked: ${formatNumber(tokens)}\nClaude: ${pct}%\nImplied limit: ${formatNumber(impliedLimit)}`);
       loadData();
+    }
+
+    async function saveTier() {
+      const tier = document.getElementById('tierSelect').value;
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier })
+      });
+      usageData.tier = tier;
+      updateUI();
     }
 
     async function loadData() {

@@ -167,6 +167,8 @@ class UsageHandler(SimpleHTTPRequestHandler):
                 data["limit"] = int(body["limit"])
             if "resetDay" in body:
                 data["resetDay"] = int(body["resetDay"])
+            if "tier" in body:
+                data["tier"] = body["tier"]
             save_data(data)
             self.send_json({"ok": True})
 

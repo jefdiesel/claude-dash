@@ -104,19 +104,15 @@ def process_otel_logs(otel_data):
                 # Only process API request events with token data
                 # event.name is "api_request", body is "claude_code.api_request"
                 if event_name == "api_request" and (input_tokens > 0 or output_tokens > 0):
-                    # Auto-detect compaction: high input (>100K) AND high output (>1K)
-                    # These don't count toward Claude's limits, but user can toggle
+                    # Label compaction events but count them (user can toggle if needed)
                     is_compaction = input_tokens > 100000 and output_tokens > 1000
 
                     session = {
                         "timestamp": datetime.now().isoformat(),
                         "input": input_tokens + cache_creation,  # cache_read doesn't count toward limits
                         "output": output_tokens,
-                        "note": f"auto: {model}" if model else "auto"
+                        "note": f"compaction: {model}" if is_compaction else (f"auto: {model}" if model else "auto")
                     }
-                    if is_compaction:
-                        session["excluded"] = True
-                        session["note"] = f"compaction: {model}" if model else "compaction"
 
                     data = load_data()
                     data["sessions"].append(session)

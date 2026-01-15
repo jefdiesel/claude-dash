@@ -101,8 +101,8 @@ tail -f ~/usage/server.log
 
 **Token counting notes:**
 - Cache read tokens don't count toward limits. Only input + output + cache_creation.
-- Compaction events (>100K input AND >1K output) are auto-detected and excluded.
-- Use the "Count" toggle in Recent API Calls to manually include/exclude any entry.
+- Compaction events (>100K input AND >1K output) are labeled but counted by default.
+- Use the "Count" toggle in Session API Calls to manually include/exclude any entry.
 
 ## API Endpoints
 

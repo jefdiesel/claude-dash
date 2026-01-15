@@ -103,6 +103,11 @@ def process_otel_logs(otel_data):
 
                 # Only process API request events with token data
                 # event.name is "api_request", body is "claude_code.api_request"
+                # Skip compaction/summarization events (large input, don't count toward Claude's limits)
+                # Threshold 120K to only catch true compaction, not large context reads
+                if input_tokens > 120000:
+                    continue
+
                 if event_name == "api_request" and (input_tokens > 0 or output_tokens > 0):
                     session = {
                         "timestamp": datetime.now().isoformat(),

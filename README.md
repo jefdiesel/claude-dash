@@ -99,7 +99,9 @@ tail -f ~/usage/server.log
 | Weekly | 80M |
 | Monthly | 180M |
 
-Note: Cache read tokens don't count toward limits. Only input + output + cache_creation.
+**Token counting notes:**
+- Cache read tokens don't count toward limits. Only input + output + cache_creation.
+- Compaction/summarization events (>120K input) are filtered out - Claude doesn't count these toward limits.
 
 ## API Endpoints
 

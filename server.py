@@ -102,7 +102,8 @@ def process_otel_logs(otel_data):
                         model = str(val)
 
                 # Only process API request events with token data
-                if event_name == "claude_code.api_request" and (input_tokens > 0 or output_tokens > 0):
+                # event.name is "api_request", body is "claude_code.api_request"
+                if event_name == "api_request" and (input_tokens > 0 or output_tokens > 0):
                     session = {
                         "timestamp": datetime.now().isoformat(),
                         "input": input_tokens + cache_read + cache_creation,

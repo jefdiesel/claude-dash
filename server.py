@@ -106,7 +106,7 @@ def process_otel_logs(otel_data):
                 if event_name == "api_request" and (input_tokens > 0 or output_tokens > 0):
                     session = {
                         "timestamp": datetime.now().isoformat(),
-                        "input": input_tokens + cache_read + cache_creation,
+                        "input": input_tokens + cache_creation,  # cache_read doesn't count toward limits
                         "output": output_tokens,
                         "note": f"auto: {model}" if model else "auto"
                     }

@@ -9,29 +9,49 @@ Local dashboard to track Claude Max 5x token usage since Anthropic's session rep
 open http://localhost:8889
 ```
 
-## What It Does
+## Features
 
-- Tracks tokens across **monthly**, **weekly**, and **5-hour session** windows
-- Auto-captures usage via OpenTelemetry (once Claude Code is restarted)
-- Shows progress bars, daily chart, session history
-- Data persists in `usage.json`
+- **Auto-capture** via OpenTelemetry integration with Claude Code
+- **Multi-window tracking**: Session (5hr), Weekly, Monthly
+- **Per-API-call chart**: Green = Opus, Blue = Haiku
+- **Comparison logging**: Record Claude's reported % alongside tracked data
+- **Calibration log**: Build training data to learn actual limits
+- **Session time input**: Enter reset time from Claude to calculate session window
+
+## Dashboard
+
+### Usage Section
+- Progress bars for Session/Weekly/Monthly
+- "Limit" buttons to record when you hit a limit
+- Stats: tracked tokens, API call count
+
+### Comparison Logging
+- Enter Claude's session % and weekly %
+- Click "Log" to save comparison data
+- Does NOT modify displayed percentages
+- Builds calibration data over time
+
+### Reset Time Input
+- Enter time remaining from Claude (e.g. "2:45")
+- Calculates actual session start time
+- Persists across page refresh
 
 ## Files
 
 ```
 ~/usage/
 ├── server.py           # Python HTTP server (port 8889)
-├── usage.json          # Token data storage
+├── usage.json          # Token + calibration data
 ├── public/index.html   # Dashboard UI
 └── README.md
 
 ~/Library/LaunchAgents/com.jef.token-tracker.plist  # Auto-start service
-~/.claude/settings.json  # Contains OTEL env vars for auto-capture
+~/.claude/settings.json  # OTEL env vars for auto-capture
 ```
 
 ## Telemetry Config
 
-Added to `~/.claude/settings.json`:
+Add to `~/.claude/settings.json`:
 ```json
 "env": {
   "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
@@ -41,7 +61,7 @@ Added to `~/.claude/settings.json`:
 }
 ```
 
-**IMPORTANT:** Restart Claude Code for telemetry to activate. New sessions will auto-log tokens.
+**Restart Claude Code for telemetry to activate.**
 
 ## Service Commands
 
@@ -56,7 +76,7 @@ launchctl load ~/Library/LaunchAgents/com.jef.token-tracker.plist
 tail -f ~/usage/server.log
 ```
 
-## Current Limits (calibrated Jan 15, 2026)
+## Current Limits (estimates)
 
 | Period | Limit | Notes |
 |--------|-------|-------|
@@ -64,19 +84,20 @@ tail -f ~/usage/server.log
 | Weekly | 17.4M | Resets Monday |
 | Session | 2.5M | 5-hour rolling window |
 
-Note: Cache read tokens don't count toward limits. Only input + output + cache_creation are tracked.
+Note: Cache read tokens don't count. Only input + output + cache_creation.
 
 ## API Endpoints
 
 - `GET /api/usage` - Get all data
 - `POST /api/session` - Add manual entry `{input, output, note}`
 - `POST /api/delete-session` - Delete entry `{index}`
+- `POST /api/calibration` - Log comparison data
 - `POST /v1/logs` - OTEL receiver (auto-capture)
 
-## Next Steps
+## Calibration Workflow
 
-1. Restart Claude Code to activate telemetry
-2. Use Claude normally - tokens will auto-log
-3. Check dashboard to see actual token counts
-4. Compare with claude.ai/settings/usage percentages
-5. Adjust limits in usage.json based on real data
+1. Use Claude Code normally
+2. Periodically check Claude's usage page
+3. Enter Claude's % in dashboard and click "Log"
+4. Over time, calibration data reveals actual limits
+5. Adjust limits in `usage.json` based on findings

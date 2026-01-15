@@ -56,6 +56,23 @@
     }
     .btn-danger { background: #da3633; color: white; }
     .btn-danger:hover { background: #f85149; }
+    .btn-log { background: #1f6feb; color: white; }
+    .btn-log:hover { background: #388bfd; }
+
+    .compare-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #21262d;
+      font-size: 13px;
+      color: #8b949e;
+    }
+    .compare-row input {
+      padding: 6px;
+      font-size: 13px;
+    }
 
     .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #21262d; }
     .stat { text-align: center; }
@@ -171,6 +188,15 @@
         <input type="text" id="resetTime" placeholder="2:45" style="width:60px;text-align:center;padding:4px;">
         <div class="stat-label">Resets In</div>
       </div>
+    </div>
+
+    <div class="compare-row">
+      <span class="compare-label">Claude shows:</span>
+      <input type="text" id="claudeSessionPct" placeholder="%" style="width:50px;text-align:center;">
+      <span>session</span>
+      <input type="text" id="claudeWeeklyPct" placeholder="%" style="width:50px;text-align:center;">
+      <span>weekly</span>
+      <button class="btn-sm btn-log" onclick="logComparison()">Log</button>
     </div>
   </div>
 
@@ -401,16 +427,59 @@
         return;
       }
 
-      container.innerHTML = calibrations.slice().reverse().slice(0, 10).map(c => `
-        <div class="calibration-entry">
+      container.innerHTML = calibrations.slice().reverse().slice(0, 10).map(c => {
+        if (c.type === 'comparison') {
+          return `<div class="calibration-entry">
+            <div class="time">${new Date(c.timestamp).toLocaleString()}</div>
+            <div class="data">
+              Ours: ${formatNumber(c.ourSession)} session, ${formatNumber(c.ourWeekly)} weekly |
+              Claude: ${c.claudeSession || '-'}% session, ${c.claudeWeekly || '-'}% weekly |
+              Implied: ${c.impliedSessionLimit ? formatNumber(c.impliedSessionLimit) : '-'} / ${c.impliedWeeklyLimit ? formatNumber(c.impliedWeeklyLimit) : '-'}
+            </div>
+          </div>`;
+        }
+        return `<div class="calibration-entry">
           <div class="time">${new Date(c.timestamp).toLocaleString()}</div>
           <div class="data">
-            Tracked: ${formatNumber(c.trackedTokens)} tokens |
-            Claude showed: ${c.claudePercent || '?'}% |
-            Implied limit: ${formatNumber(c.impliedLimit || 0)}
+            ${c.type || 'session'} limit | Tracked: ${formatNumber(c.trackedTokens)} | Claude: ${c.claudePercent}% | Implied: ${formatNumber(c.impliedLimit || 0)}
           </div>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
+    }
+
+    async function logComparison() {
+      const sessionPct = parseFloat(document.getElementById('claudeSessionPct').value) || 0;
+      const weeklyPct = parseFloat(document.getElementById('claudeWeeklyPct').value) || 0;
+
+      if (!sessionPct && !weeklyPct) {
+        alert('Enter at least one percentage from Claude');
+        return;
+      }
+
+      const sessionTokens = sumTokens(getSessionsInRange(getSessionStart()));
+      const weeklyTokens = sumTokens(getSessionsInRange(getWeekStart()));
+
+      const comparison = {
+        timestamp: new Date().toISOString(),
+        type: 'comparison',
+        ourSession: sessionTokens,
+        ourWeekly: weeklyTokens,
+        claudeSession: sessionPct,
+        claudeWeekly: weeklyPct,
+        impliedSessionLimit: sessionPct > 0 ? Math.round(sessionTokens / (sessionPct / 100)) : null,
+        impliedWeeklyLimit: weeklyPct > 0 ? Math.round(weeklyTokens / (weeklyPct / 100)) : null
+      };
+
+      await fetch('/api/calibration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(comparison)
+      });
+
+      document.getElementById('claudeSessionPct').value = '';
+      document.getElementById('claudeWeeklyPct').value = '';
+
+      loadData();
     }
 
     async function markLimit(type) {
@@ -464,8 +533,13 @@
       loadData();
     }
 
-    // Update session start when reset time changes
-    document.getElementById('resetTime').addEventListener('input', updateUI);
+    // Persist reset time to localStorage
+    const resetTimeInput = document.getElementById('resetTime');
+    resetTimeInput.value = localStorage.getItem('resetTime') || '';
+    resetTimeInput.addEventListener('input', () => {
+      localStorage.setItem('resetTime', resetTimeInput.value);
+      updateUI();
+    });
 
     loadData();
     setInterval(loadData, 10000);

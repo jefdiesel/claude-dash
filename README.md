@@ -82,8 +82,8 @@ tail -f ~/usage/server.log
 | Period | Limit | Notes |
 |--------|-------|-------|
 | Session | **2.0M** | 5-hour rolling window |
-| Weekly | **20M** | Resets Thursday |
-| Monthly | 45M | Resets on 1st |
+| Weekly | **20M** | 7-day rolling window |
+| Monthly | 45M | 30-day rolling from signup |
 
 ### Pro (estimated)
 | Period | Limit |

@@ -214,22 +214,27 @@
         <div class="stat-label">Weekly</div>
       </div>
       <div class="stat">
-        <div class="stat-value" id="apiCalls">-</div>
-        <div class="stat-label">Calls</div>
+        <div class="stat-value" id="monthlyTokens">-</div>
+        <div class="stat-label">Monthly</div>
       </div>
       <div class="stat">
-        <input type="text" id="resetTime" placeholder="2:45" style="width:60px;text-align:center;padding:4px;">
-        <div class="stat-label">Resets In</div>
+        <div class="stat-value" id="apiCalls">-</div>
+        <div class="stat-label">Calls</div>
       </div>
     </div>
 
     <div class="compare-row">
-      <span class="compare-label">Claude shows:</span>
-      <input type="text" id="claudeSessionPct" placeholder="%" style="width:50px;text-align:center;">
+      <span>Claude:</span>
+      <input type="text" id="claudeSessionPct" placeholder="%" style="width:45px;text-align:center;">
       <span>session</span>
-      <input type="text" id="claudeWeeklyPct" placeholder="%" style="width:50px;text-align:center;">
+      <input type="text" id="claudeWeeklyPct" placeholder="%" style="width:45px;text-align:center;">
       <span>weekly</span>
       <button class="btn-sm btn-log" onclick="logComparison()">Log</button>
+      <span style="margin-left:auto;">Resets:</span>
+      <input type="text" id="resetTime" placeholder="2:45" style="width:50px;text-align:center;" title="Session reset time">
+      <span>sess</span>
+      <input type="text" id="weeklyResetDay" placeholder="Thu" style="width:45px;text-align:center;" title="Weekly reset day">
+      <span>wk</span>
     </div>
   </div>
 
@@ -324,9 +329,26 @@
 
     function getWeekStart() {
       const now = new Date();
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      return new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0);
+      const dayInput = document.getElementById('weeklyResetDay')?.value?.toLowerCase() || '';
+
+      // Parse day name to number (0=Sun, 1=Mon, etc)
+      const dayMap = {sun:0, mon:1, tue:2, wed:3, thu:4, fri:5, sat:6};
+      let resetDay = 1; // Default Monday
+      for (const [name, num] of Object.entries(dayMap)) {
+        if (dayInput.startsWith(name)) {
+          resetDay = num;
+          break;
+        }
+      }
+
+      const currentDay = now.getDay();
+      let daysAgo = currentDay - resetDay;
+      if (daysAgo < 0) daysAgo += 7;
+
+      const start = new Date(now);
+      start.setDate(start.getDate() - daysAgo);
+      start.setHours(0, 0, 0, 0);
+      return start;
     }
 
     function getMonthStart() {
@@ -392,6 +414,7 @@
 
       document.getElementById('sessionTokens').textContent = formatNumber(sessionUsed);
       document.getElementById('weeklyTokens').textContent = formatNumber(weeklyUsed);
+      document.getElementById('monthlyTokens').textContent = formatNumber(monthlyUsed);
       document.getElementById('apiCalls').textContent = sessionSessions.length;
 
       // Sessions table
@@ -604,11 +627,19 @@
       loadData();
     }
 
-    // Persist reset time to localStorage
+    // Persist inputs to localStorage
     const resetTimeInput = document.getElementById('resetTime');
+    const weeklyResetInput = document.getElementById('weeklyResetDay');
+
     resetTimeInput.value = localStorage.getItem('resetTime') || '';
+    weeklyResetInput.value = localStorage.getItem('weeklyResetDay') || '';
+
     resetTimeInput.addEventListener('input', () => {
       localStorage.setItem('resetTime', resetTimeInput.value);
+      updateUI();
+    });
+    weeklyResetInput.addEventListener('input', () => {
+      localStorage.setItem('weeklyResetDay', weeklyResetInput.value);
       updateUI();
     });
 

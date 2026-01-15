@@ -182,6 +182,18 @@ class UsageHandler(SimpleHTTPRequestHandler):
                 self.send_json({"ok": True, "removed": removed})
             else:
                 self.send_json({"ok": False, "error": "Invalid index"})
+
+        elif path == "/api/calibration":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+
+            data = load_data()
+            if "calibrations" not in data:
+                data["calibrations"] = []
+            data["calibrations"].append(body)
+            save_data(data)
+            self.send_json({"ok": True, "calibration": body})
+
         else:
             self.send_error(404)
 

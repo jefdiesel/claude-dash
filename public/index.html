@@ -300,7 +300,7 @@
   </div>
 
   <div class="card">
-    <h2>Recent API Calls</h2>
+    <h2>Session API Calls</h2>
     <table id="sessionsTable">
       <thead>
         <tr><th>Time</th><th>Input</th><th>Output</th><th>Total</th><th>Model</th><th>Count</th><th></th></tr>
@@ -472,12 +472,17 @@
         empty.style.display = 'block';
       } else {
         empty.style.display = 'none';
-        tbody.innerHTML = usageData.sessions
+        // Show all calls in current session window
+        const sessionStart = getSessionStart();
+        const sessionCalls = usageData.sessions
+          .map((s, idx) => ({ ...s, idx }))
+          .filter(s => new Date(s.timestamp) >= sessionStart);
+
+        tbody.innerHTML = sessionCalls
           .slice()
           .reverse()
-          .slice(0, 50)
-          .map((s, i) => {
-            const idx = usageData.sessions.length - 1 - i;
+          .map((s) => {
+            const idx = s.idx;
             const dt = new Date(s.timestamp);
             const time = dt.toLocaleTimeString();
             const total = (s.input || 0) + (s.output || 0);

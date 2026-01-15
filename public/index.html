@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Max Token Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      padding: 24px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 { color: #58a6ff; margin-bottom: 8px; font-size: 24px; }
+    .subtitle { color: #8b949e; margin-bottom: 24px; }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 14px; color: #8b949e; margin-bottom: 12px; text-transform: uppercase; }
+    .progress-row { display: flex; align-items: center; margin-bottom: 16px; }
+    .progress-row:last-child { margin-bottom: 0; }
+    .progress-label { width: 80px; font-size: 13px; color: #8b949e; }
+    .progress-container { flex: 1; background: #21262d; border-radius: 6px; height: 24px; overflow: hidden; }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #238636, #2ea043);
+      transition: width 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      font-weight: 600;
+      font-size: 12px;
+      min-width: 40px;
+    }
+    .progress-bar.warning { background: linear-gradient(90deg, #9e6a03, #d29922); }
+    .progress-bar.danger { background: linear-gradient(90deg, #da3633, #f85149); }
+    .progress-info { width: 140px; text-align: right; font-size: 12px; color: #8b949e; margin-left: 12px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #21262d; }
+    .stat { text-align: center; }
+    .stat-value { font-size: 20px; font-weight: 600; color: #f0f6fc; }
+    .stat-label { font-size: 11px; color: #8b949e; margin-top: 4px; }
+    .chart-container { height: 180px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #21262d; }
+    th { color: #8b949e; font-weight: 500; }
+    .form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+    .form-group { flex: 1; }
+    .form-group label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+    input, button, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-size: 14px;
+    }
+    input:focus, select:focus { outline: none; border-color: #58a6ff; }
+    button {
+      background: #238636;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover { background: #2ea043; }
+    .btn-secondary { background: #21262d; }
+    .btn-secondary:hover { background: #30363d; }
+    .delete-btn {
+      background: none;
+      border: none;
+      color: #f85149;
+      cursor: pointer;
+      padding: 4px 8px;
+      width: auto;
+    }
+    .delete-btn:hover { text-decoration: underline; }
+    .empty { color: #8b949e; text-align: center; padding: 24px; }
+    .session-tag {
+      display: inline-block;
+      background: #21262d;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #58a6ff;
+    }
+  </style>
+</head>
+<body>
+  <h1>Claude Max Token Tracker</h1>
+  <p class="subtitle">5x Plan Usage Monitor</p>
+
+  <div class="card">
+    <h2>Usage Limits</h2>
+
+    <div class="progress-row">
+      <div class="progress-label">Monthly</div>
+      <div class="progress-container">
+        <div class="progress-bar" id="monthlyBar">0%</div>
+      </div>
+      <div class="progress-info" id="monthlyInfo">- / 45M</div>
+    </div>
+
+    <div class="progress-row">
+      <div class="progress-label">Weekly</div>
+      <div class="progress-container">
+        <div class="progress-bar" id="weeklyBar">0%</div>
+      </div>
+      <div class="progress-info" id="weeklyInfo">- / 11M</div>
+    </div>
+
+    <div class="progress-row">
+      <div class="progress-label">Session (5hr)</div>
+      <div class="progress-container">
+        <div class="progress-bar" id="sessionBar">0%</div>
+      </div>
+      <div class="progress-info" id="sessionInfo">- / 1.5M</div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="monthlyTokens">-</div>
+        <div class="stat-label">This Month</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="weeklyTokens">-</div>
+        <div class="stat-label">This Week</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="sessionTokens">-</div>
+        <div class="stat-label">Last 5 Hours</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="daysLeft">-</div>
+        <div class="stat-label">Days to Reset</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Daily Usage (Last 14 Days)</h2>
+    <div class="chart-container">
+      <canvas id="usageChart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Add Session</h2>
+    <form id="addForm">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Input Tokens</label>
+          <input type="number" id="inputTokens" placeholder="0" required>
+        </div>
+        <div class="form-group">
+          <label>Output Tokens</label>
+          <input type="number" id="outputTokens" placeholder="0" required>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px">
+        <label>Note (optional)</label>
+        <input type="text" id="sessionNote" placeholder="What were you working on?">
+      </div>
+      <button type="submit">Add Session</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Recent Sessions</h2>
+    <table id="sessionsTable">
+      <thead>
+        <tr><th>Time</th><th>Input</th><th>Output</th><th>Total</th><th>Note</th><th></th></tr>
+      </thead>
+      <tbody id="sessionsList"></tbody>
+    </table>
+    <div id="emptyState" class="empty" style="display: none">No sessions recorded yet</div>
+  </div>
+
+  <script>
+    let chart = null;
+    let usageData = {
+      monthlyLimit: 45000000,
+      weeklyLimit: 11000000,
+      sessionLimit: 1500000,
+      resetDay: 1,
+      sessions: []
+    };
+
+    function formatNumber(n) {
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return n.toString();
+    }
+
+    function getMonthStart() {
+      const now = new Date();
+      const resetDay = usageData.resetDay || 1;
+      let start = new Date(now.getFullYear(), now.getMonth(), resetDay, 0, 0, 0);
+      if (now.getDate() < resetDay) {
+        start.setMonth(start.getMonth() - 1);
+      }
+      return start;
+    }
+
+    function getWeekStart() {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0);
+    }
+
+    function getSessionStart() {
+      // 5-hour rolling window
+      return new Date(Date.now() - 5 * 60 * 60 * 1000);
+    }
+
+    function getSessionsInRange(start) {
+      return usageData.sessions.filter(s => new Date(s.timestamp) >= start);
+    }
+
+    function sumTokens(sessions) {
+      return sessions.reduce((sum, s) => sum + (s.input || 0) + (s.output || 0), 0);
+    }
+
+    function getDaysUntilReset() {
+      const now = new Date();
+      const resetDay = usageData.resetDay || 1;
+      let nextReset = new Date(now.getFullYear(), now.getMonth(), resetDay);
+      if (now.getDate() >= resetDay) {
+        nextReset.setMonth(nextReset.getMonth() + 1);
+      }
+      return Math.ceil((nextReset - now) / (1000 * 60 * 60 * 24));
+    }
+
+    function updateProgressBar(barId, infoId, used, limit) {
+      const percent = Math.min(100, (used / limit) * 100);
+      const bar = document.getElementById(barId);
+      bar.style.width = Math.max(percent, 3) + '%';
+      bar.textContent = percent.toFixed(1) + '%';
+      bar.className = 'progress-bar' + (percent > 80 ? ' danger' : percent > 60 ? ' warning' : '');
+      document.getElementById(infoId).textContent = `${formatNumber(used)} / ${formatNumber(limit)}`;
+    }
+
+    function updateUI() {
+      const monthlyLimit = usageData.monthlyLimit || usageData.limit || 45000000;
+      const weeklyLimit = usageData.weeklyLimit || 11000000;
+      const sessionLimit = usageData.sessionLimit || 1500000;
+
+      const monthlyUsed = sumTokens(getSessionsInRange(getMonthStart()));
+      const weeklyUsed = sumTokens(getSessionsInRange(getWeekStart()));
+      const sessionUsed = sumTokens(getSessionsInRange(getSessionStart()));
+
+      updateProgressBar('monthlyBar', 'monthlyInfo', monthlyUsed, monthlyLimit);
+      updateProgressBar('weeklyBar', 'weeklyInfo', weeklyUsed, weeklyLimit);
+      updateProgressBar('sessionBar', 'sessionInfo', sessionUsed, sessionLimit);
+
+      document.getElementById('monthlyTokens').textContent = formatNumber(monthlyUsed);
+      document.getElementById('weeklyTokens').textContent = formatNumber(weeklyUsed);
+      document.getElementById('sessionTokens').textContent = formatNumber(sessionUsed);
+      document.getElementById('daysLeft').textContent = getDaysUntilReset();
+
+      // Sessions table
+      const tbody = document.getElementById('sessionsList');
+      const empty = document.getElementById('emptyState');
+
+      if (usageData.sessions.length === 0) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+        tbody.innerHTML = usageData.sessions
+          .slice()
+          .reverse()
+          .slice(0, 30)
+          .map((s, i) => {
+            const idx = usageData.sessions.length - 1 - i;
+            const dt = new Date(s.timestamp);
+            const time = dt.toLocaleString();
+            const total = (s.input || 0) + (s.output || 0);
+            const isAuto = (s.note || '').startsWith('auto:');
+            const note = isAuto
+              ? `<span class="session-tag">${s.note.replace('auto:', '').trim()}</span>`
+              : (s.note || '-');
+            return `<tr>
+              <td>${time}</td>
+              <td>${formatNumber(s.input || 0)}</td>
+              <td>${formatNumber(s.output || 0)}</td>
+              <td>${formatNumber(total)}</td>
+              <td>${note}</td>
+              <td><button class="delete-btn" onclick="deleteSession(${idx})">x</button></td>
+            </tr>`;
+          })
+          .join('');
+      }
+
+      updateChart();
+    }
+
+    function updateChart() {
+      const dailyData = {};
+      const sessions = getSessionsInRange(getMonthStart());
+
+      sessions.forEach(s => {
+        const date = s.timestamp.split('T')[0];
+        if (!dailyData[date]) dailyData[date] = 0;
+        dailyData[date] += (s.input || 0) + (s.output || 0);
+      });
+
+      const labels = Object.keys(dailyData).sort().slice(-14);
+      const data = labels.map(d => dailyData[d]);
+
+      if (chart) {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = data;
+        chart.update();
+      } else {
+        chart = new Chart(document.getElementById('usageChart'), {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Tokens',
+              data,
+              backgroundColor: '#238636',
+              borderRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: '#8b949e' } },
+              y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
+            }
+          }
+        });
+      }
+    }
+
+    async function loadData() {
+      const res = await fetch('/api/usage');
+      usageData = await res.json();
+      updateUI();
+    }
+
+    async function deleteSession(idx) {
+      if (!confirm('Delete this session?')) return;
+      await fetch('/api/delete-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index: idx })
+      });
+      loadData();
+    }
+
+    document.getElementById('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = parseInt(document.getElementById('inputTokens').value) || 0;
+      const output = parseInt(document.getElementById('outputTokens').value) || 0;
+      const note = document.getElementById('sessionNote').value;
+
+      await fetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input, output, note })
+      });
+
+      document.getElementById('inputTokens').value = '';
+      document.getElementById('outputTokens').value = '';
+      document.getElementById('sessionNote').value = '';
+      loadData();
+    });
+
+    loadData();
+    setInterval(loadData, 30000);
+  </script>
+</body>
+</html>

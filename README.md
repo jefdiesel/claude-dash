@@ -76,15 +76,30 @@ launchctl load ~/Library/LaunchAgents/com.jef.token-tracker.plist
 tail -f ~/usage/server.log
 ```
 
-## Current Limits (estimates)
+## Tier Limits
 
+### Max 5x (calibrated Jan 15, 2026)
 | Period | Limit | Notes |
 |--------|-------|-------|
+| Session | **2.0M** | 5-hour rolling window |
+| Weekly | **20M** | Resets Thursday |
 | Monthly | 45M | Resets on 1st |
-| Weekly | 17.4M | Resets Monday |
-| Session | 2.5M | 5-hour rolling window |
 
-Note: Cache read tokens don't count. Only input + output + cache_creation.
+### Pro (estimated)
+| Period | Limit |
+|--------|-------|
+| Session | 500K |
+| Weekly | 3.5M |
+| Monthly | 10M |
+
+### Max 20x (estimated, 4x Max 5x)
+| Period | Limit |
+|--------|-------|
+| Session | 8M |
+| Weekly | 80M |
+| Monthly | 180M |
+
+Note: Cache read tokens don't count toward limits. Only input + output + cache_creation.
 
 ## API Endpoints
 

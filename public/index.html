@@ -45,38 +45,17 @@
     .progress-bar.danger { background: linear-gradient(90deg, #da3633, #f85149); }
     .progress-info { width: 140px; text-align: right; font-size: 12px; color: #8b949e; margin-left: 12px; }
 
-    .session-admin {
-      display: flex;
-      gap: 12px;
-      align-items: flex-end;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #21262d;
-    }
-    .admin-group { flex: 1; }
-    .admin-group label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; }
-    .admin-group input {
-      width: 100%;
-      padding: 8px;
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 11px;
       border-radius: 4px;
-      border: 1px solid #30363d;
-      background: #0d1117;
-      color: #c9d1d9;
-      font-size: 14px;
-    }
-    .admin-group .hint { font-size: 10px; color: #6e7681; margin-top: 2px; }
-
-    .btn-limit {
-      background: #da3633;
       border: none;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 4px;
       cursor: pointer;
-      font-weight: 500;
-      white-space: nowrap;
+      margin-left: 8px;
+      width: auto;
     }
-    .btn-limit:hover { background: #f85149; }
+    .btn-danger { background: #da3633; color: white; }
+    .btn-danger:hover { background: #f85149; }
 
     .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #21262d; }
     .stat { text-align: center; }
@@ -147,14 +126,15 @@
   <p class="subtitle">5x Plan Usage Monitor</p>
 
   <div class="card">
-    <h2>Session Control</h2>
+    <h2>Usage</h2>
 
     <div class="progress-row">
-      <div class="progress-label">Session (5hr)</div>
+      <div class="progress-label">Session</div>
       <div class="progress-container">
         <div class="progress-bar" id="sessionBar">0%</div>
       </div>
       <div class="progress-info" id="sessionInfo">- / 2.5M</div>
+      <button class="btn-sm btn-danger" onclick="markLimit('session')">Limit</button>
     </div>
 
     <div class="progress-row">
@@ -163,6 +143,7 @@
         <div class="progress-bar" id="weeklyBar">0%</div>
       </div>
       <div class="progress-info" id="weeklyInfo">- / 17.4M</div>
+      <button class="btn-sm btn-danger" onclick="markLimit('weekly')">Limit</button>
     </div>
 
     <div class="progress-row">
@@ -173,36 +154,22 @@
       <div class="progress-info" id="monthlyInfo">- / 45M</div>
     </div>
 
-    <div class="session-admin">
-      <div class="admin-group">
-        <label>Session Resets In (from Claude dash)</label>
-        <input type="text" id="resetTime" placeholder="e.g. 3:18 or 3h 18m">
-        <div class="hint">Enter time remaining, we'll calculate session start</div>
-      </div>
-      <div class="admin-group">
-        <label>Session Start</label>
-        <input type="text" id="sessionStart" readonly>
-        <div class="hint">Calculated from reset time</div>
-      </div>
-      <button class="btn-limit" onclick="markSessionLimit()">Session Hit Limit</button>
-    </div>
-
     <div class="stats">
       <div class="stat">
         <div class="stat-value" id="sessionTokens">-</div>
-        <div class="stat-label">This Session</div>
+        <div class="stat-label">Session</div>
       </div>
       <div class="stat">
         <div class="stat-value" id="weeklyTokens">-</div>
-        <div class="stat-label">This Week</div>
+        <div class="stat-label">Weekly</div>
       </div>
       <div class="stat">
         <div class="stat-value" id="apiCalls">-</div>
-        <div class="stat-label">API Calls</div>
+        <div class="stat-label">Calls</div>
       </div>
       <div class="stat">
-        <div class="stat-value" id="sessionTimeLeft">-</div>
-        <div class="stat-label">Time Left</div>
+        <input type="text" id="resetTime" placeholder="2:45" style="width:60px;text-align:center;padding:4px;">
+        <div class="stat-label">Resets In</div>
       </div>
     </div>
   </div>
@@ -265,21 +232,16 @@
     }
 
     function getSessionStart() {
-      // If user provided reset time, calculate from that
       const resetInput = document.getElementById('resetTime').value;
       const resetMinutes = parseResetTime(resetInput);
 
       if (resetMinutes) {
         // Session is 5 hours (300 min). If reset in X min, started (300 - X) min ago
-        const sessionDuration = 5 * 60; // 300 minutes
-        const minutesAgo = sessionDuration - resetMinutes;
-        const start = new Date(Date.now() - minutesAgo * 60 * 1000);
-        document.getElementById('sessionStart').value = start.toLocaleTimeString();
-        return start;
+        const minutesAgo = 300 - resetMinutes;
+        return new Date(Date.now() - minutesAgo * 60 * 1000);
       }
 
       // Default: 5-hour rolling window
-      document.getElementById('sessionStart').value = 'Rolling 5hr';
       return new Date(Date.now() - 5 * 60 * 60 * 1000);
     }
 
@@ -452,31 +414,38 @@
       `).join('');
     }
 
-    async function markSessionLimit() {
-      const claudePercent = prompt('What percentage did Claude show when limit was hit? (e.g. 100 or 95)');
+    async function markLimit(type) {
+      const claudePercent = prompt(`What percentage did Claude show for ${type} when limit was hit?`);
       if (!claudePercent) return;
 
-      const sessionStart = getSessionStart();
-      const sessionTokens = sumTokens(getSessionsInRange(sessionStart));
       const pct = parseFloat(claudePercent);
-      const impliedLimit = pct > 0 ? Math.round(sessionTokens / (pct / 100)) : 0;
+      let tokens, limitType;
+
+      if (type === 'session') {
+        tokens = sumTokens(getSessionsInRange(getSessionStart()));
+        limitType = 'session';
+      } else if (type === 'weekly') {
+        tokens = sumTokens(getSessionsInRange(getWeekStart()));
+        limitType = 'weekly';
+      }
+
+      const impliedLimit = pct > 0 ? Math.round(tokens / (pct / 100)) : 0;
 
       const calibration = {
         timestamp: new Date().toISOString(),
-        trackedTokens: sessionTokens,
+        type: limitType,
+        trackedTokens: tokens,
         claudePercent: pct,
-        impliedLimit: impliedLimit,
-        sessionStart: sessionStart.toISOString()
+        impliedLimit: impliedLimit
       };
 
-      // Save calibration
       await fetch('/api/calibration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(calibration)
       });
 
-      alert(`Calibration recorded!\nTracked: ${formatNumber(sessionTokens)}\nClaude: ${pct}%\nImplied limit: ${formatNumber(impliedLimit)}`);
+      alert(`${type} calibration recorded!\nTracked: ${formatNumber(tokens)}\nClaude: ${pct}%\nImplied limit: ${formatNumber(impliedLimit)}`);
       loadData();
     }
 

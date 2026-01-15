@@ -95,6 +95,39 @@
       font-size: 13px;
     }
 
+    .timer-row {
+      display: flex;
+      gap: 24px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #21262d;
+    }
+    .timer-group {
+      flex: 1;
+    }
+    .timer-group label {
+      display: block;
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 4px;
+    }
+    .timer-input {
+      width: 100%;
+      padding: 8px;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .timer-display {
+      font-size: 28px;
+      font-weight: 600;
+      font-family: monospace;
+      color: #58a6ff;
+      text-align: center;
+      padding: 12px;
+      background: #21262d;
+      border-radius: 6px;
+    }
+
     .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #21262d; }
     .stat { text-align: center; }
     .stat-value { font-size: 20px; font-weight: 600; color: #f0f6fc; }
@@ -230,11 +263,19 @@
       <input type="text" id="claudeWeeklyPct" placeholder="%" style="width:45px;text-align:center;">
       <span>weekly</span>
       <button class="btn-sm btn-log" onclick="logComparison()">Log</button>
-      <span style="margin-left:auto;">Resets:</span>
-      <input type="text" id="resetTime" placeholder="2:45" style="width:50px;text-align:center;" title="Session reset time">
-      <span>sess</span>
-      <input type="text" id="weeklyResetDay" placeholder="Thu" style="width:45px;text-align:center;" title="Weekly reset day">
-      <span>wk</span>
+    </div>
+
+    <div class="timer-row">
+      <div class="timer-group">
+        <label>Session Resets</label>
+        <input type="text" id="resetTime" placeholder="2:45" class="timer-input">
+        <div class="timer-display" id="sessionCountdown">--:--:--</div>
+      </div>
+      <div class="timer-group">
+        <label>Weekly Resets</label>
+        <input type="text" id="weeklyResetDay" placeholder="Thu 8:00" class="timer-input">
+        <div class="timer-display" id="weeklyCountdown">-- days --:--:--</div>
+      </div>
     </div>
   </div>
 
@@ -629,27 +670,83 @@
 
     // Session countdown timer
     let sessionEndTime = null;
+    let weeklyEndTime = null;
 
     function startSessionTimer(minutesLeft) {
       sessionEndTime = Date.now() + (minutesLeft * 60 * 1000);
       localStorage.setItem('sessionEndTime', sessionEndTime);
     }
 
+    function parseWeeklyReset(str) {
+      // Parse "Thu 8:00" or "Thu 8:00 AM" format
+      if (!str) return null;
+      const dayMap = {sun:0, mon:1, tue:2, wed:3, thu:4, fri:5, sat:6};
+      const match = str.toLowerCase().match(/^(sun|mon|tue|wed|thu|fri|sat)\w*\s*(\d{1,2}):?(\d{2})?\s*(am|pm)?/i);
+      if (!match) return null;
+
+      let day = dayMap[match[1]];
+      let hour = parseInt(match[2]);
+      let min = parseInt(match[3]) || 0;
+      if (match[4]?.toLowerCase() === 'pm' && hour < 12) hour += 12;
+      if (match[4]?.toLowerCase() === 'am' && hour === 12) hour = 0;
+
+      return { day, hour, min };
+    }
+
+    function startWeeklyTimer(parsed) {
+      const now = new Date();
+      const target = new Date(now);
+      target.setHours(parsed.hour, parsed.min, 0, 0);
+
+      let daysUntil = parsed.day - now.getDay();
+      if (daysUntil < 0 || (daysUntil === 0 && target <= now)) {
+        daysUntil += 7;
+      }
+      target.setDate(target.getDate() + daysUntil);
+
+      weeklyEndTime = target.getTime();
+      localStorage.setItem('weeklyEndTime', weeklyEndTime);
+    }
+
     function updateCountdown() {
-      const input = document.getElementById('resetTime');
+      const sessionDisplay = document.getElementById('sessionCountdown');
+      const weeklyDisplay = document.getElementById('weeklyCountdown');
+
+      // Session countdown
       if (!sessionEndTime) {
         sessionEndTime = parseInt(localStorage.getItem('sessionEndTime')) || null;
       }
       if (sessionEndTime) {
         const remaining = sessionEndTime - Date.now();
         if (remaining > 0) {
-          const mins = Math.floor(remaining / 60000);
+          const hrs = Math.floor(remaining / 3600000);
+          const mins = Math.floor((remaining % 3600000) / 60000);
           const secs = Math.floor((remaining % 60000) / 1000);
-          input.value = `${Math.floor(mins/60)}:${String(mins%60).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+          sessionDisplay.textContent = `${hrs}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
         } else {
-          input.value = '0:00:00';
+          sessionDisplay.textContent = '0:00:00';
+          sessionDisplay.style.color = '#f85149';
           sessionEndTime = null;
           localStorage.removeItem('sessionEndTime');
+        }
+      }
+
+      // Weekly countdown
+      if (!weeklyEndTime) {
+        weeklyEndTime = parseInt(localStorage.getItem('weeklyEndTime')) || null;
+      }
+      if (weeklyEndTime) {
+        const remaining = weeklyEndTime - Date.now();
+        if (remaining > 0) {
+          const days = Math.floor(remaining / 86400000);
+          const hrs = Math.floor((remaining % 86400000) / 3600000);
+          const mins = Math.floor((remaining % 3600000) / 60000);
+          const secs = Math.floor((remaining % 60000) / 1000);
+          weeklyDisplay.textContent = `${days}d ${hrs}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        } else {
+          weeklyDisplay.textContent = '0d 0:00:00';
+          weeklyEndTime = null;
+          localStorage.removeItem('weeklyEndTime');
         }
       }
     }
@@ -676,9 +773,23 @@
         startSessionTimer(mins);
       }
     });
-    weeklyResetInput.addEventListener('input', () => {
+    weeklyResetInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const parsed = parseWeeklyReset(weeklyResetInput.value);
+        if (parsed) {
+          startWeeklyTimer(parsed);
+          weeklyResetInput.style.borderColor = '#238636';
+          setTimeout(() => weeklyResetInput.style.borderColor = '', 1000);
+        }
+        localStorage.setItem('weeklyResetDay', weeklyResetInput.value);
+      }
+    });
+    weeklyResetInput.addEventListener('blur', () => {
+      const parsed = parseWeeklyReset(weeklyResetInput.value);
+      if (parsed && !weeklyEndTime) {
+        startWeeklyTimer(parsed);
+      }
       localStorage.setItem('weeklyResetDay', weeklyResetInput.value);
-      updateUI();
     });
 
     // Initialize countdown display

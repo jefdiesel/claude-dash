@@ -660,9 +660,19 @@
 
     weeklyResetInput.value = localStorage.getItem('weeklyResetDay') || '';
 
-    resetTimeInput.addEventListener('change', () => {
+    resetTimeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const mins = parseResetTime(resetTimeInput.value);
+        if (mins) {
+          startSessionTimer(mins);
+          resetTimeInput.style.borderColor = '#238636';
+          setTimeout(() => resetTimeInput.style.borderColor = '', 1000);
+        }
+      }
+    });
+    resetTimeInput.addEventListener('blur', () => {
       const mins = parseResetTime(resetTimeInput.value);
-      if (mins) {
+      if (mins && !sessionEndTime) {
         startSessionTimer(mins);
       }
     });

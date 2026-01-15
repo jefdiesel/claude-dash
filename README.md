@@ -56,15 +56,15 @@ launchctl load ~/Library/LaunchAgents/com.jef.token-tracker.plist
 tail -f ~/usage/server.log
 ```
 
-## Current Limits (estimates - adjust in usage.json)
+## Current Limits (calibrated Jan 15, 2026)
 
 | Period | Limit | Notes |
 |--------|-------|-------|
 | Monthly | 45M | Resets on 1st |
-| Weekly | 11M | Resets Monday |
-| Session | 1.5M | 5-hour rolling window |
+| Weekly | 17.4M | Resets Monday |
+| Session | 2.5M | 5-hour rolling window |
 
-**TODO:** Session limit may be wrong. Based on 11% usage in ~20min, actual cap might be 4-6M. Update `sessionLimit` in `usage.json` once real data comes in.
+Note: Cache read tokens don't count toward limits. Only input + output + cache_creation are tracked.
 
 ## API Endpoints
 

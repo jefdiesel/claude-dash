@@ -1,6 +1,6 @@
 {
   "monthlyLimit": 45000000,
-  "weeklyLimit": 33500000,
-  "sessionLimit": 4800000,
+  "weeklyLimit": 17400000,
+  "sessionLimit": 2500000,
   "sessions": []
 }
